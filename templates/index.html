@@ -26,6 +26,7 @@
             border: none;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             position: relative;
+            margin-bottom: 1rem;
         }
         .student-card:hover {
             transform: translateY(-3px);
@@ -66,13 +67,65 @@
             text-decoration: none;
             color: inherit;
             display: block;
-            padding-right: 60px; /* space for delete button */
+            padding-right: 60px;
         }
-        .add-button {
-            margin-bottom: 1.5rem;
+        .club-card {
+            transition: transform 0.2s;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            height: 100%;
         }
-        .alert-floating {
+        .club-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+        .club-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             margin-bottom: 1.5rem;
+            margin-top: 2rem;
+        }
+        .stats-card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 2rem;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 0.5rem;
+        }
+        .stat-number {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .btn-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .empty-state i {
+            font-size: 4rem;
+            color: #dee2e6;
+            margin-bottom: 1rem;
         }
         @media (max-width: 576px) {
             .avatar-circle {
@@ -83,6 +136,13 @@
             .delete-btn {
                 right: 0.5rem;
             }
+            .btn-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+            .btn-actions .btn {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -91,31 +151,113 @@
 <!-- Шапка -->
 <div class="school-header">
     <div class="container">
-        <h1 class="display-5 fw-bold"><i class="bi bi-building"></i> {{ school_name }}</h1>
-        <p class="lead mb-0">{{ title }}</p>
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="display-5 fw-bold">
+                    <i class="bi bi-building"></i> {{ school_name }}
+                </h1>
+                <p class="lead mb-0">{{ title }}</p>
+            </div>
+            <div>
+                <i class="bi bi-mortarboard" style="font-size: 3rem; opacity: 0.5;"></i>
+            </div>
+        </div>
     </div>
 </div>
 
 <div class="container">
-    <!-- Кнопка добавления ученика -->
-    <div class="add-button d-flex justify-content-end">
-        <a href="/add-student-with-avatar" class="btn btn-success btn-lg">
-            <i class="bi bi-person-plus-fill"></i> Добавить ученика
-        </a>
-    </div>
-
     <!-- Сообщение об успехе -->
     {% if success %}
-    <div class="alert alert-success alert-dismissible fade show alert-floating" role="alert">
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
         <i class="bi bi-check-circle-fill"></i> {{ success }}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
     {% endif %}
 
-    <h2 class="mb-4"><i class="bi bi-people-fill"></i> Наши ученики</h2>
+    <!-- Сообщение об ошибке -->
+    {% if error %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle-fill"></i> {{ error }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
+    <!-- Статистика -->
+    {% if students %}
+    <div class="stats-card">
+        <div class="row">
+            <div class="col-md-3 col-6">
+                <div class="stat-item">
+                    <div class="stat-number">{{ students|length }}</div>
+                    <div class="stat-label">Всего учеников</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-item">
+                    <div class="stat-number">
+                        {% set grades_list = [] %}
+                        {% for student in students %}
+                            {% for grade in student.grades %}
+                                {% set _ = grades_list.append(grade) %}
+                            {% endfor %}
+                        {% endfor %}
+                        {{ grades_list|length }}
+                    </div>
+                    <div class="stat-label">Всего оценок</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-item">
+                    <div class="stat-number">{{ clubs|length if clubs else 0 }}</div>
+                    <div class="stat-label">Кружков</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-item">
+                    <div class="stat-number">
+                        {% set total_clubs = 0 %}
+                        {% for student in students %}
+                            {% set total_clubs = total_clubs + student.clubs|length %}
+                        {% endfor %}
+                        {{ total_clubs }}
+                    </div>
+                    <div class="stat-label">Записей в кружки</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Кнопки действий -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="btn-actions">
+            <a href="/clubs" class="btn btn-outline-primary">
+                <i class="bi bi-calendar-check"></i> Все кружки
+            </a>
+            <a href="/leaders" class="btn btn-outline-warning">
+                <i class="bi bi-trophy"></i> Лидеры
+            </a>
+            <a href="/admin/clubs" class="btn btn-outline-secondary">
+                <i class="bi bi-gear"></i> Управление
+            </a>
+        </div>
+        <a href="/add-student-with-avatar" class="btn btn-success">
+            <i class="bi bi-person-plus-fill"></i> Добавить ученика
+        </a>
+    </div>
+
+    <!-- Секция учеников -->
+    <div class="section-title">
+        <h2 class="mb-0">
+            <i class="bi bi-people-fill"></i> Наши ученики
+        </h2>
+        {% if students %}
+        <span class="badge bg-primary rounded-pill fs-6">{{ students|length }}</span>
+        {% endif %}
+    </div>
 
     {% if students %}
-        <div class="row g-3">
+        <div class="row g-3 mb-4">
             {% for student in students %}
             <div class="col-12">
                 <div class="card student-card">
@@ -128,11 +270,37 @@
                                     {{ student.name[0]|upper }}
                                 {% endif %}
                             </div>
-                            <div>
+                            <div class="flex-grow-1">
                                 <h5 class="card-title mb-1 text-success">{{ student.name }}</h5>
-                                <p class="card-text text-secondary mb-0">
-                                    {{ student.grade }} класс • {{ student.hobby }}
+                                <p class="card-text text-secondary mb-1">
+                                    <i class="bi bi-backpack"></i> {{ student.grade }} класс
                                 </p>
+                                <p class="card-text text-secondary mb-0">
+                                    <i class="bi bi-heart"></i> {{ student.hobby }}
+                                </p>
+                                <!-- Мини-статистика -->
+                                <div class="mt-2">
+                                    {% if student.grades %}
+                                        {% set avg = 0 %}
+                                        {% for grade in student.grades %}
+                                            {% set avg = avg + grade.score %}
+                                        {% endfor %}
+                                        {% set avg = avg / student.grades|length %}
+                                        <span class="badge
+                                            {% if avg >= 4.5 %}bg-success
+                                            {% elif avg >= 4 %}bg-info
+                                            {% elif avg >= 3 %}bg-warning
+                                            {% else %}bg-danger{% endif %}">
+                                            <i class="bi bi-star"></i> {{ "%.1f"|format(avg) }}
+                                        </span>
+                                    {% endif %}
+                                    <span class="badge bg-secondary">
+                                        <i class="bi bi-journal"></i> {{ student.grades|length }}
+                                    </span>
+                                    <span class="badge bg-secondary">
+                                        <i class="bi bi-calendar"></i> {{ student.clubs|length }}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </a>
@@ -145,24 +313,137 @@
             </div>
             {% endfor %}
         </div>
-        <div class="mt-4 text-muted">
-            <i class="bi bi-person-check"></i> Всего учеников: {{ students|length }}
-        </div>
     {% else %}
-        <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i> Пока нет учеников. Добавьте первого!
+        <div class="empty-state">
+            <i class="bi bi-people"></i>
+            <h3>Пока нет учеников</h3>
+            <p class="text-muted">Добавьте первого ученика, чтобы начать работу с системой</p>
+            <a href="/add-student-with-avatar" class="btn btn-success btn-lg mt-3">
+                <i class="bi bi-person-plus-fill"></i> Добавить ученика
+            </a>
         </div>
     {% endif %}
+
+    <!-- Секция кружков -->
+    {% if clubs %}
+    <div class="section-title">
+        <h2 class="mb-0">
+            <i class="bi bi-star-fill text-warning"></i> Кружки и секции
+        </h2>
+        <div>
+            <a href="/clubs" class="btn btn-sm btn-outline-secondary me-2">
+                Все кружки <i class="bi bi-arrow-right"></i>
+            </a>
+            <a href="/admin/clubs" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-gear"></i> Управление
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        {% for club in clubs[:6] %}
+        <div class="col-md-4 col-sm-6">
+            <div class="card club-card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-start">
+                        <div class="club-icon me-3">
+                            {% if "Баскетбол" in club.name or "баскетбол" in club.name %}🏀
+                            {% elif "Изо" in club.name or "Рисование" in club.name %}🎨
+                            {% elif "Робот" in club.name %}🤖
+                            {% elif "Театр" in club.name or "театр" in club.name %}🎭
+                            {% elif "Гитара" in club.name or "музык" in club.name %}🎸
+                            {% elif "Фото" in club.name %}📸
+                            {% elif "Английский" in club.name or "англ" in club.name %}🗣️
+                            {% elif "Математи" in club.name %}🧮
+                            {% elif "Химик" in club.name or "хими" in club.name %}🔬
+                            {% elif "Танц" in club.name or "Хореограф" in club.name %}💃
+                            {% elif "Шахматы" in club.name or "шахмат" in club.name %}♟️
+                            {% elif "Вокал" in club.name or "Хор" in club.name %}🎤
+                            {% elif "Волейбол" in club.name or "волейбол" in club.name %}🏐
+                            {% elif "Программ" in club.name %}💻
+                            {% elif "Литератур" in club.name %}📚
+                            {% elif "Спорт" in club.name %}⚽
+                            {% else %}🎯{% endif %}
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-1">{{ club.name }}</h6>
+                            <p class="card-text small text-muted mb-1">
+                                <i class="bi bi-person"></i> {{ club.teacher }}
+                            </p>
+                            <p class="card-text small text-muted mb-0">
+                                <i class="bi bi-door-open"></i> {{ club.room }}
+                                {% if club.schedule %}
+                                <br><i class="bi bi-clock"></i> {{ club.schedule }}
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% elif not students %}
+        <!-- Если нет ни учеников, ни кружков -->
+        <div class="section-title">
+            <h2 class="mb-0">
+                <i class="bi bi-star-fill text-warning"></i> Кружки и секции
+            </h2>
+        </div>
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Кружки ещё не добавлены.
+            <a href="/admin/clubs" class="alert-link">Добавьте кружки в панели управления</a>.
+        </div>
+    {% endif %}
+
+    <!-- Информация о системе -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="card bg-light border-0">
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-4 mb-3 mb-md-0">
+                            <i class="bi bi-person-plus fs-1 text-primary"></i>
+                            <h6 class="mt-2">Добавление учеников</h6>
+                            <p class="small text-muted">Создавайте профили учеников с фото и информацией</p>
+                        </div>
+                        <div class="col-md-4 mb-3 mb-md-0">
+                            <i class="bi bi-journal-check fs-1 text-success"></i>
+                            <h6 class="mt-2">Учёт успеваемости</h6>
+                            <p class="small text-muted">Выставляйте оценки и следите за прогрессом</p>
+                        </div>
+                        <div class="col-md-4">
+                            <i class="bi bi-calendar-event fs-1 text-warning"></i>
+                            <h6 class="mt-2">Кружки и секции</h6>
+                            <p class="small text-muted">Записывайте учеников в кружки и секции</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
     function confirmDelete(studentName) {
-        if (confirm(`Вы уверены, что хотите удалить ученика "${studentName}"?`)) {
+        if (confirm(`Вы уверены, что хотите удалить ученика "${studentName}"?\n\nВсе данные, включая оценки и записи в кружки, будут безвозвратно удалены.`)) {
             window.location.href = `/delete-student/${encodeURIComponent(studentName)}`;
         }
     }
+
+    // Автоматическое скрытие алертов через 5 секунд
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            var alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                var bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            });
+        }, 5000);
+    });
 </script>
-<!-- Bootstrap JS Bundle (для работы alert-dismissible) -->
+
+<!-- Bootstrap JS Bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

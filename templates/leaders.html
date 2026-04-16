@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} | Школа №7</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-bottom: 2rem;
+        }
+        .leaders-header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            border-radius: 0 0 1rem 1rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .filter-card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 2rem;
+        }
+        .leader-card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+            border-left: 5px solid transparent;
+        }
+        .leader-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+        .leader-card.top-1 {
+            border-left-color: #FFD700;
+            background: linear-gradient(90deg, rgba(255,215,0,0.05) 0%, rgba(255,255,255,1) 100%);
+        }
+        .leader-card.top-2 {
+            border-left-color: #C0C0C0;
+            background: linear-gradient(90deg, rgba(192,192,192,0.05) 0%, rgba(255,255,255,1) 100%);
+        }
+        .leader-card.top-3 {
+            border-left-color: #CD7F32;
+            background: linear-gradient(90deg, rgba(205,127,50,0.05) 0%, rgba(255,255,255,1) 100%);
+        }
+        .avatar-leader {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.5rem;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .avatar-leader img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .rank-badge {
+            font-size: 1.2rem;
+            font-weight: bold;
+            min-width: 40px;
+            text-align: center;
+        }
+        .medal-1 { color: #FFD700; }
+        .medal-2 { color: #C0C0C0; }
+        .medal-3 { color: #CD7F32; }
+        .average-score {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .score-excellent { color: #28a745; }
+        .score-good { color: #17a2b8; }
+        .score-average { color: #ffc107; }
+        .score-poor { color: #dc3545; }
+        .stats-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .filter-form {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 10px;
+        }
+        .summary-stats {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 2rem;
+        }
+        .stat-box {
+            text-align: center;
+            padding: 1rem;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Шапка -->
+<div class="leaders-header">
+    <div class="container">
+        <h1 class="display-5 fw-bold">
+            <i class="bi bi-trophy-fill"></i> {{ title }}
+        </h1>
+        <p class="lead mb-0">Рейтинг учеников по среднему баллу</p>
+    </div>
+</div>
+
+<div class="container">
+    <!-- Навигация -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/"><i class="bi bi-house"></i> Главная</a></li>
+            <li class="breadcrumb-item active">Лидеры успеваемости</li>
+        </ol>
+    </nav>
+
+    <!-- Сводная статистика -->
+    <div class="summary-stats">
+        <div class="row">
+            <div class="col-md-3 col-6">
+                <div class="stat-box">
+                    <div class="stat-number">{{ stats.total_students }}</div>
+                    <div class="stat-label">Всего учеников</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-box">
+                    <div class="stat-number">{{ stats.total_grades }}</div>
+                    <div class="stat-label">Всего оценок</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-box">
+                    <div class="stat-number">{{ "%.2f"|format(stats.school_average) }}</div>
+                    <div class="stat-label">Средний балл по школе</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-box">
+                    <div class="stat-number">{{ stats.excellent_count }}</div>
+                    <div class="stat-label">Отличников</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Фильтры -->
+    <div class="filter-card">
+        <h5 class="mb-3"><i class="bi bi-funnel"></i> Фильтры</h5>
+        <form method="get" action="/leaders" class="filter-form">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label for="grade_filter" class="form-label">Класс</label>
+                    <select class="form-select" id="grade_filter" name="grade">
+                        <option value="all" {% if current_grade == 'all' %}selected{% endif %}>Все классы</option>
+                        {% for g in range(1, 12) %}
+                        <option value="{{ g }}" {% if current_grade|int == g %}selected{% endif %}>{{ g }} класс</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="min_avg" class="form-label">Мин. средний балл</label>
+                    <select class="form-select" id="min_avg" name="min_avg">
+                        <option value="0" {% if current_min_avg == '0' %}selected{% endif %}>Все</option>
+                        <option value="3" {% if current_min_avg == '3' %}selected{% endif %}>≥ 3.0</option>
+                        <option value="3.5" {% if current_min_avg == '3.5' %}selected{% endif %}>≥ 3.5</option>
+                        <option value="4" {% if current_min_avg == '4' %}selected{% endif %}>≥ 4.0</option>
+                        <option value="4.5" {% if current_min_avg == '4.5' %}selected{% endif %}>≥ 4.5</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="sort_by" class="form-label">Сортировка</label>
+                    <select class="form-select" id="sort_by" name="sort">
+                        <option value="avg_desc" {% if current_sort == 'avg_desc' %}selected{% endif %}>По баллу (выс-низ)</option>
+                        <option value="avg_asc" {% if current_sort == 'avg_asc' %}selected{% endif %}>По баллу (низ-выс)</option>
+                        <option value="name_asc" {% if current_sort == 'name_asc' %}selected{% endif %}>По имени (А-Я)</option>
+                        <option value="name_desc" {% if current_sort == 'name_desc' %}selected{% endif %}>По имени (Я-А)</option>
+                        <option value="grade_asc" {% if current_sort == 'grade_asc' %}selected{% endif %}>По классу (возр)</option>
+                        <option value="grade_desc" {% if current_sort == 'grade_desc' %}selected{% endif %}>По классу (убыв)</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg"></i> Применить
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Список лидеров -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3><i class="bi bi-list-ol"></i> Рейтинг учеников</h3>
+        {% if current_grade != 'all' %}
+        <span class="badge bg-info">{{ current_grade }} класс</span>
+        {% endif %}
+    </div>
+
+    {% if leaders %}
+        {% for student in leaders %}
+        <div class="leader-card {% if loop.index == 1 %}top-1{% elif loop.index == 2 %}top-2{% elif loop.index == 3 %}top-3{% endif %}">
+            <div class="d-flex align-items-center gap-3">
+                <!-- Ранг -->
+                <div class="rank-badge">
+                    {% if loop.index == 1 %}
+                        <i class="bi bi-trophy-fill medal-1" style="font-size: 2rem;"></i>
+                    {% elif loop.index == 2 %}
+                        <i class="bi bi-trophy-fill medal-2" style="font-size: 1.8rem;"></i>
+                    {% elif loop.index == 3 %}
+                        <i class="bi bi-trophy-fill medal-3" style="font-size: 1.6rem;"></i>
+                    {% else %}
+                        <span class="text-muted">#{{ loop.index }}</span>
+                    {% endif %}
+                </div>
+
+                <!-- Аватар -->
+                <a href="/student/{{ student.name }}" class="text-decoration-none">
+                    <div class="avatar-leader">
+                        {% if student.avatar %}
+                            <img src="{{ student.avatar }}" alt="{{ student.name }}">
+                        {% else %}
+                            {{ student.name[0]|upper }}
+                        {% endif %}
+                    </div>
+                </a>
+
+                <!-- Информация -->
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center flex-wrap">
+                        <a href="/student/{{ student.name }}" class="text-decoration-none">
+                            <h5 class="mb-0 me-3">{{ student.name }}</h5>
+                        </a>
+                        <span class="badge bg-secondary">{{ student.grade }} класс</span>
+                    </div>
+                    <div class="mt-2">
+                        <span class="stats-badge bg-light text-dark">
+                            <i class="bi bi-journal-bookmark"></i> {{ student.grades_count }} оценок
+                        </span>
+                        <span class="stats-badge bg-light text-dark">
+                            <i class="bi bi-calendar-check"></i> {{ student.clubs_count }} кружков
+                        </span>
+                        {% if student.best_subject %}
+                        <span class="stats-badge bg-light text-dark">
+                            <i class="bi bi-star"></i> Лучший: {{ student.best_subject }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Средний балл -->
+                <div class="text-center">
+                    <div class="average-score
+                        {% if student.average_score >= 4.5 %}score-excellent
+                        {% elif student.average_score >= 4 %}score-good
+                        {% elif student.average_score >= 3 %}score-average
+                        {% else %}score-poor{% endif %}">
+                        {{ "%.2f"|format(student.average_score) }}
+                    </div>
+                    <small class="text-muted">средний балл</small>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            {% if current_grade != 'all' %}
+                В {{ current_grade }} классе пока нет учеников с оценками.
+            {% else %}
+                Пока нет учеников с оценками. <a href="/" class="alert-link">Добавьте оценки ученикам</a>.
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <!-- Дополнительная статистика по классам -->
+    {% if class_stats %}
+    <div class="mt-5">
+        <h4 class="mb-3"><i class="bi bi-bar-chart"></i> Статистика по классам</h4>
+        <div class="row g-3">
+            {% for stat in class_stats %}
+            <div class="col-md-3 col-6">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">{{ stat.grade }} класс</h6>
+                        <div class="display-6 mb-2
+                            {% if stat.avg_score >= 4.5 %}text-success
+                            {% elif stat.avg_score >= 4 %}text-info
+                            {% elif stat.avg_score >= 3 %}text-warning
+                            {% else %}text-danger{% endif %}">
+                            {{ "%.2f"|format(stat.avg_score) }}
+                        </div>
+                        <small class="text-muted">
+                            {{ stat.students_count }} учеников<br>
+                            {{ stat.total_grades }} оценок
+                        </small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

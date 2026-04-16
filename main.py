@@ -103,6 +103,28 @@ async def student_profile(request: Request, student_name: str, db: Session = Dep
     )
 
 
+# ========== ГЛАВНАЯ СТРАНИЦА (читаем из БД) ==========
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request, db: Session = Depends(get_db)):
+    """
+    Главная страница со списком учеников и кружков
+    """
+    # ✅ Получаем всех учеников из БД
+    students = db.query(StudentDB).all()
+
+    # ✅ Получаем все кружки для отображения
+    clubs = db.query(ClubDB).limit(6).all()
+
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "students": students,
+            "clubs": clubs,  # Добавляем кружки
+            "school_name": "Школа №7",
+            "title": "Моя школа"
+        }
+    )
 # ========== ФОРМА ДОБАВЛЕНИЯ ==========
 @app.get("/add-student-with-avatar", response_class=HTMLResponse)
 async def show_add_form(request: Request):
@@ -113,6 +135,152 @@ async def show_add_form(request: Request):
     )
 
 
+# ========== СТРАНИЦА ЛИДЕРОВ С ФИЛЬТРАМИ ==========
+@app.get("/leaders", response_class=HTMLResponse)
+async def leaders_board(
+        request: Request,
+        grade: str = "all",
+        min_avg: str = "0",
+        sort: str = "avg_desc",
+        db: Session = Depends(get_db)
+):
+    """
+    Страница с рейтингом учеников по среднему баллу
+    с возможностью фильтрации по классу и сортировки
+    """
+    # Базовый запрос всех учеников
+    query = db.query(StudentDB)
+
+    # Фильтр по классу
+    if grade != "all":
+        query = query.filter(StudentDB.grade == int(grade))
+
+    students = query.all()
+
+    # Собираем статистику для каждого ученика
+    leaders_data = []
+    for student in students:
+        grades = student.grades
+        if grades:
+            avg_score = sum(g.score for g in grades) / len(grades)
+
+            # Находим лучший предмет
+            subject_scores = {}
+            for g in grades:
+                if g.subject not in subject_scores:
+                    subject_scores[g.subject] = []
+                subject_scores[g.subject].append(g.score)
+
+            best_subject = None
+            best_avg = 0
+            for subject, scores in subject_scores.items():
+                subject_avg = sum(scores) / len(scores)
+                if subject_avg > best_avg:
+                    best_avg = subject_avg
+                    best_subject = subject
+
+            leaders_data.append({
+                'student': student,
+                'average_score': avg_score,
+                'grades_count': len(grades),
+                'clubs_count': len(student.clubs),
+                'best_subject': best_subject,
+                'best_subject_avg': best_avg
+            })
+        else:
+            leaders_data.append({
+                'student': student,
+                'average_score': 0,
+                'grades_count': 0,
+                'clubs_count': len(student.clubs),
+                'best_subject': None,
+                'best_subject_avg': 0
+            })
+
+    # Фильтр по минимальному среднему баллу
+    min_avg_float = float(min_avg)
+    if min_avg_float > 0:
+        leaders_data = [d for d in leaders_data if d['average_score'] >= min_avg_float]
+
+    # Сортировка
+    if sort == "avg_desc":
+        leaders_data.sort(key=lambda x: x['average_score'], reverse=True)
+    elif sort == "avg_asc":
+        leaders_data.sort(key=lambda x: x['average_score'])
+    elif sort == "name_asc":
+        leaders_data.sort(key=lambda x: x['student'].name)
+    elif sort == "name_desc":
+        leaders_data.sort(key=lambda x: x['student'].name, reverse=True)
+    elif sort == "grade_asc":
+        leaders_data.sort(key=lambda x: x['student'].grade)
+    elif sort == "grade_desc":
+        leaders_data.sort(key=lambda x: x['student'].grade, reverse=True)
+
+    # Подготовка данных для шаблона
+    leaders = []
+    for data in leaders_data:
+        leaders.append({
+            'id': data['student'].id,
+            'name': data['student'].name,
+            'grade': data['student'].grade,
+            'avatar': data['student'].avatar,
+            'average_score': data['average_score'],
+            'grades_count': data['grades_count'],
+            'clubs_count': data['clubs_count'],
+            'best_subject': data['best_subject']
+        })
+
+    # Общая статистика
+    all_students = db.query(StudentDB).all()
+    all_grades = db.query(GradeDB).all()
+
+    total_grades = len(all_grades)
+    school_average = sum(g.score for g in all_grades) / total_grades if total_grades > 0 else 0
+
+    # Считаем отличников (средний балл >= 4.5)
+    excellent_count = len([l for l in leaders_data if l['average_score'] >= 4.5])
+
+    stats = {
+        'total_students': len(all_students),
+        'total_grades': total_grades,
+        'school_average': school_average,
+        'excellent_count': excellent_count
+    }
+
+    # Статистика по классам
+    class_stats = []
+    for g in range(1, 12):
+        class_students = [s for s in students if s.grade == g]
+        if class_students:
+            class_grades = []
+            for s in class_students:
+                class_grades.extend(s.grades)
+
+            if class_grades:
+                class_avg = sum(gr.score for gr in class_grades) / len(class_grades)
+            else:
+                class_avg = 0
+
+            class_stats.append({
+                'grade': g,
+                'students_count': len(class_students),
+                'total_grades': len(class_grades),
+                'avg_score': class_avg
+            })
+
+    return templates.TemplateResponse(
+        "leaders.html",
+        {
+            "request": request,
+            "leaders": leaders,
+            "stats": stats,
+            "class_stats": class_stats,
+            "current_grade": grade,
+            "current_min_avg": min_avg,
+            "current_sort": sort,
+            "title": "Лидеры успеваемости"
+        }
+    )
 # ========== ДОБАВЛЕНИЕ УЧЕНИКА (сохраняем в БД) ==========
 @app.post("/add-student-with-avatar")
 async def add_student_with_avatar(
