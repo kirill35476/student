@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Вход в систему{% endblock %}
+
+{% block extra_css %}
+<style>
+    body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set hide_header = true %}
+{% set hide_nav = true %}
+{% set hide_footer = true %}
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <i class="bi bi-building"></i>
+            <h2>Школа №7</h2>
+            <p>Войдите в свой аккаунт</p>
+        </div>
+        
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+        
+        <form method="post" action="/login">
+            <div class="mb-3">
+                <label for="username" class="form-label"><i class="bi bi-person"></i> Логин</label>
+                <input type="text" class="form-control" id="username" name="username" placeholder="Введите логин" required autofocus>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label"><i class="bi bi-lock"></i> Пароль</label>
+                <input type="password" class="form-control" id="password" name="password" placeholder="Введите пароль" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 btn-icon"><i class="bi bi-box-arrow-in-right"></i> Войти</button>
+        </form>
+        
+        <hr class="my-4">
+        
+        <div class="text-center">
+            <p class="text-muted mb-2">Тестовые аккаунты:</p>
+            <small>
+                <strong>Ученик:</strong> masha / masha123<br>
+                <strong>Учитель:</strong> teacher / teacher123<br>
+                <strong>Админ:</strong> admin / admin123
+            </small>
+        </div>
+    </div>
+</div>
+{% endblock %}

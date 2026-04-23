@@ -1,27 +1,23 @@
-# main.py (добавляем в начало файла)
+# main.py
 
 from fastapi import FastAPI, Request, HTTPException, Depends, status
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi import Form, UploadFile, File
-from typing import Annotated, Optional  # для опциональных аргументов
+from typing import Annotated, Optional
 import shutil
 import os
 from sqlalchemy.orm import Session
 from datetime import datetime
-# Для работы с сессиями (чтобы запоминать, кто вошёл)
 from fastapi import Cookie
-# Импортируем наши БД-штуки (обновлённые)
-from database import get_db, create_test_users,StudentDB, GradeDB, ClubDB, StudentClubDB, UserDB, UserRole, check_permission, get_current_user,SessionLocal
-
+from database import get_db, create_test_users, StudentDB, GradeDB, ClubDB, StudentClubDB, UserDB, UserRole, check_permission, get_current_user, SessionLocal
+from contextlib import asynccontextmanager
 
 # Настройки для загрузки картинок
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif"}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 
-
-# main.py - добавить в начало файла
 
 def transliterate(name: str) -> str:
     """Преобразует русское имя в латиницу (для логина)"""
@@ -53,8 +49,6 @@ def generate_password() -> str:
     return ''.join(random.choice(chars) for _ in range(8))
 
 
-
-
 def validate_image(file: UploadFile):
     """Проверяет, что файл - допустимое изображение"""
     ext = os.path.splitext(file.filename)[1].lower()
@@ -75,9 +69,10 @@ def validate_image(file: UploadFile):
         )
     return True
 
-# Простая система сессий (в реальном проекте используйте JWT или OAuth2)
-# Храним пользователей в словаре: session_token -> username
+
+# Простая система сессий
 active_sessions = {}
+
 def generate_session_token():
     """Генерирует простой токен для сессии"""
     import hashlib
@@ -85,32 +80,21 @@ def generate_session_token():
     return hashlib.md5(f"{time.time()}{os.urandom(16)}".encode()).hexdigest()
 
 
-# main.py (добавляем в lifespan)
-
-from contextlib import asynccontextmanager
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Запускается при старте приложения"""
     print("🚀 Запускаем приложение...")
-
-    # Создаём тестовых пользователей
     db = SessionLocal()
     try:
-        create_test_users(db)  # функция из database.py
+        create_test_users(db)
     finally:
         db.close()
-
     print("✅ Приложение готово к работе!")
     yield
     print("👋 Останавливаем приложение...")
 
 
-# Обновляем создание app
 app = FastAPI(title="Школа с БД", lifespan=lifespan)
-
-# app = FastAPI(title="Школа с БД")
 
 # Подключаем статику и шаблоны
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -125,30 +109,23 @@ def get_current_user_from_session(
         session_token: Optional[str] = Cookie(None),
         db: Session = Depends(get_db)
 ):
-    """
-    Получает текущего пользователя из cookie
-    """
+    """Получает текущего пользователя из cookie"""
     if not session_token or session_token not in active_sessions:
         return None
-
     username = active_sessions[session_token]
     user = db.query(UserDB).filter(UserDB.username == username).first()
     return user
 
 
-
-
 # ========== СТРАНИЦА ВХОДА ==========
-
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    """
-    Показывает страницу входа в систему
-    """
+    """Показывает страницу входа в систему"""
     return templates.TemplateResponse(
         "login.html",
         {"request": request, "title": "Вход в систему"}
     )
+
 
 @app.post("/login")
 async def login(
@@ -157,13 +134,10 @@ async def login(
         password: Annotated[str, Form()],
         db: Session = Depends(get_db)
 ):
-    """
-    Обрабатывает форму входа
-    """
-    # Ищем пользователя в базе данных
+    """Обрабатывает форму входа"""
     user = db.query(UserDB).filter(
         UserDB.username == username,
-        UserDB.password == password  # В реальном проекте пароли хешируют!
+        UserDB.password == password
     ).first()
 
     if not user:
@@ -176,61 +150,52 @@ async def login(
             }
         )
 
-    # Создаём сессию
     session_token = generate_session_token()
     active_sessions[session_token] = user.username
 
-    # Создаём ответ и устанавливаем cookie
     response = RedirectResponse(url="/", status_code=303)
     response.set_cookie(key="session_token", value=session_token, httponly=True)
-
     return response
+
 
 @app.get("/logout")
 async def logout():
-    """
-    Выход из системы
-    """
+    """Выход из системы"""
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie("session_token")
     return response
 
 
-# ========== ГЛАВНАЯ СТРАНИЦА (с проверкой прав) ==========
+# ========== ГЛАВНАЯ СТРАНИЦА ==========
 @app.get("/", response_class=HTMLResponse)
 async def home(
         request: Request,
         db: Session = Depends(get_db),
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """
-    Главная страница со списком учеников
-    - Ученик видит только свой профиль
-    - Учитель и Админ видят всех учеников
-    """
-    # Если пользователь не авторизован - отправляем на страницу входа
     if not current_user:
         return RedirectResponse(url="/login", status_code=303)
 
-    # Определяем, какие данные показывать
     if current_user.role == UserRole.STUDENT:
-        # Ученик видит только себя
         student = db.query(StudentDB).filter(StudentDB.id == current_user.student_id).first()
         students = [student] if student else []
-        show_add_button = False  # ученик не может добавлять
-        show_delete_buttons = False  # ученик не может удалять
-        show_edit_buttons = False  # ученик не может редактировать
+        show_add_button = False
+        show_delete_buttons = False
+        show_edit_buttons = False
     else:
-        # Учитель и Админ видят всех
         students = db.query(StudentDB).all()
-        show_add_button = True  # учитель и админ могут добавлять
-        show_edit_buttons = True  # учитель и админ могут редактировать
-        show_delete_buttons = (current_user.role == UserRole.ADMIN)  # ТОЛЬКО админ удаляет
+        show_add_button = True
+        show_edit_buttons = True
+        show_delete_buttons = (current_user.role == UserRole.ADMIN)
+
+    clubs = db.query(ClubDB).all()
+
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "students": students,
+            "clubs": clubs,
             "school_name": "Школа №7",
             "title": "Моя школа",
             "current_user": current_user,
@@ -240,7 +205,48 @@ async def home(
         }
     )
 
-# ========== СТРАНИЦА ПРОФИЛЯ (с оценками и кружками) по ID и ролям ==========
+
+# ========== УДАЛЕНИЕ УЧЕНИКА (POST) ==========
+@app.post("/delete-student/{student_id}")
+async def delete_student(
+    request: Request,
+    student_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_current_user_from_session)
+):
+    """Удаляет ученика (ТОЛЬКО АДМИН)"""
+    if not current_user or current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+
+    student = db.query(StudentDB).filter(StudentDB.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Ученик не найден")
+
+    student_name = student.name
+    db.delete(student)
+    db.commit()
+
+    students = db.query(StudentDB).all()
+    clubs = db.query(ClubDB).all()
+
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "students": students,
+            "clubs": clubs,
+            "school_name": "Школа №7",
+            "title": "Моя школа",
+            "current_user": current_user,
+            "show_add_button": True,
+            "show_edit_buttons": True,
+            "show_delete_buttons": True,
+            "success": f"✅ Ученик {student_name} удалён!"
+        }
+    )
+
+
+# ========== СТРАНИЦА ПРОФИЛЯ ==========
 @app.get("/student/{student_id}", response_class=HTMLResponse)
 async def student_profile(
         request: Request,
@@ -248,33 +254,24 @@ async def student_profile(
         db: Session = Depends(get_db),
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """
-    Страница ученика с оценками и кружками
-    - Ученик может видеть только свой профиль
-    - Учитель и Админ могут видеть любого ученика
-    """
     if not current_user:
         return RedirectResponse(url="/login", status_code=303)
 
-    # Проверяем права доступа к профилю
     if current_user.role == UserRole.STUDENT:
-        # Ученик может смотреть только свой профиль
         if current_user.student_id != student_id:
             raise HTTPException(status_code=403, detail="У вас нет доступа к этому профилю")
 
     student = db.query(StudentDB).filter(StudentDB.id == student_id).first()
-
     if not student:
         raise HTTPException(status_code=404, detail="Ученик не найден")
 
     all_clubs = db.query(ClubDB).all()
 
-    # Определяем, какие кнопки показывать
-    can_add_grade = current_user.role != UserRole.STUDENT  # учитель и админ
-    can_edit = current_user.role != UserRole.STUDENT  # учитель и админ
-    can_join_club = current_user.role == UserRole.STUDENT  # ученик может записываться
-    can_leave_club = (current_user.role == UserRole.STUDENT)  # только ученик
-    can_manage_clubs = current_user.role == UserRole.ADMIN  # только админ управляет кружками
+    can_add_grade = current_user.role != UserRole.STUDENT
+    can_edit = current_user.role != UserRole.STUDENT
+    can_join_club = current_user.role == UserRole.STUDENT
+    can_leave_club = current_user.role == UserRole.STUDENT
+    can_manage_clubs = current_user.role == UserRole.ADMIN
 
     return templates.TemplateResponse(
         "profile.html",
@@ -293,13 +290,13 @@ async def student_profile(
     )
 
 
-# ========== ФОРМА ДОБАВЛЕНИЯ УЧЕНИКА (только для админа) ==========
+# ========== ФОРМА ДОБАВЛЕНИЯ УЧЕНИКА ==========
 @app.get("/add-student-with-avatar", response_class=HTMLResponse)
 async def show_add_form(
         request: Request,
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """Показывает форму добавления ученика (только для админа)"""
+    """Показывает форму добавления ученика (только для учителя и админа)"""
     if not current_user or current_user.role == UserRole.STUDENT:
         raise HTTPException(status_code=403, detail="Доступ запрещён")
 
@@ -309,8 +306,7 @@ async def show_add_form(
     )
 
 
-
-# ========== ДОБАВЛЕНИЕ УЧЕНИКА (с созданием пользователя) ==========
+# ========== ДОБАВЛЕНИЕ УЧЕНИКА (POST) ==========
 @app.post("/add-student-with-avatar")
 async def add_student_with_avatar(
         request: Request,
@@ -321,14 +317,11 @@ async def add_student_with_avatar(
         db: Session = Depends(get_db),
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """
-    ✅ Добавляет нового ученика в базу данных и создаёт пользователя
-    """
-    # Проверка прав (учитель или админ)
+    """Добавляет нового ученика и создаёт пользователя"""
     if not current_user or current_user.role == UserRole.STUDENT:
         raise HTTPException(status_code=403, detail="Доступ запрещён")
 
-    # 1. ПРОВЕРЯЕМ КАРТИНКУ
+    # Проверяем картинку
     try:
         validate_image(avatar)
     except HTTPException as e:
@@ -341,14 +334,13 @@ async def add_student_with_avatar(
             }
         )
 
-    # 2. СОХРАНЯЕМ КАРТИНКУ
+    # Сохраняем картинку
     filename = f"{name}_{avatar.filename}"
     filepath = os.path.join(AVATAR_DIR, filename)
-
     with open(filepath, "wb") as buffer:
         shutil.copyfileobj(avatar.file, buffer)
 
-    # 3. СОЗДАЁМ НОВОГО УЧЕНИКА В БД
+    # Создаём ученика
     new_student = StudentDB(
         name=name,
         grade=grade,
@@ -357,42 +349,43 @@ async def add_student_with_avatar(
     )
     db.add(new_student)
     db.commit()
-    db.refresh(new_student)  # Получаем ID нового ученика
+    db.refresh(new_student)
 
-    # 4. ✅ СОЗДАЁМ ПОЛЬЗОВАТЕЛЯ ДЛЯ УЧЕНИКА
+    # Создаём пользователя
     username = transliterate(name)
-
-    # Проверяем, не занят ли логин
     existing_user = db.query(UserDB).filter(UserDB.username == username).first()
     if existing_user:
-        # Если логин занят, добавляем ID в конец
         username = f"{username}_{new_student.id}"
 
     password = generate_password()
 
-    new_user = UserDB(
-        username=username,
-        password=password,
-        role=UserRole.STUDENT,
-        student_id=new_student.id
-    )
-    db.add(new_user)
+    existing_student_user = db.query(UserDB).filter(UserDB.student_id == new_student.id).first()
+    if existing_student_user:
+        existing_student_user.username = username
+        existing_student_user.password = password
+    else:
+        new_user = UserDB(
+            username=username,
+            password=password,
+            role=UserRole.STUDENT,
+            student_id=new_student.id
+        )
+        db.add(new_user)
     db.commit()
 
-    # 5. ПОЛУЧАЕМ ОБНОВЛЁННЫЙ СПИСОК
     students = db.query(StudentDB).all()
+    clubs = db.query(ClubDB).all()
 
-    # Определяем права доступа для отображения кнопок
     show_add_button = True
     show_edit_buttons = True
     show_delete_buttons = (current_user.role == UserRole.ADMIN)
 
-    # 6. ВОЗВРАЩАЕМ ГЛАВНУЮ СТРАНИЦУ С ДАННЫМИ ДЛЯ ВХОДА
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "students": students,
+            "clubs": clubs,
             "school_name": "Школа №7",
             "title": "Моя школа",
             "current_user": current_user,
@@ -407,56 +400,8 @@ async def add_student_with_avatar(
         }
     )
 
-# ========== УДАЛЕНИЕ УЧЕНИКА (удаляем из БД) по ID ==========
 
-@app.post("/delete-student/{student_id}")
-async def delete_student(
-    request: Request,
-    student_id: int,
-    db: Session = Depends(get_db),
-    current_user: Optional[UserDB] = Depends(get_current_user_from_session)
-):
-    """Удаляет ученика (ТОЛЬКО АДМИН)"""
-    # Проверка прав
-    if not current_user or current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Доступ запрещён. Только для администратора.")
-
-    # Находим ученика
-    student = db.query(StudentDB).filter(StudentDB.id == student_id).first()
-    if not student:
-        raise HTTPException(status_code=404, detail="Ученик не найден")
-
-    student_name = student.name
-
-    # Удаляем ученика
-    db.delete(student)
-    db.commit()
-
-    # Получаем обновлённый список
-    students = db.query(StudentDB).all()
-
-    # Определяем права доступа для отображения кнопок
-    show_add_button = True  # админ может добавлять
-    show_edit_buttons = True  # админ может редактировать
-    show_delete_buttons = (current_user.role == UserRole.ADMIN)
-
-    # ✅ ВОЗВРАЩАЕМ ШАБЛОН С current_user
-    return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "students": students,
-            "school_name": "Школа №7",
-            "title": "Моя школа",
-            "current_user": current_user,  # ✅ ОБЯЗАТЕЛЬНО!
-            "show_add_button": show_add_button,
-            "show_edit_buttons": show_edit_buttons,
-            "show_delete_buttons": show_delete_buttons,
-            "success": f"✅ Ученик {student_name} удалён!"
-        }
-    )
-
-# ========== РЕДАКТИРОВАНИЕ УЧЕНИКА (учитель и админ) ==========
+# ========== РЕДАКТИРОВАНИЕ УЧЕНИКА ==========
 @app.get("/edit/{student_id}", response_class=HTMLResponse)
 async def show_edit_form(
         request: Request,
@@ -464,13 +409,11 @@ async def show_edit_form(
         db: Session = Depends(get_db),
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """Обновляет данные ученика (только для учителя и админа)"""
-    # ✅ ПРОВЕРКА ПРАВ
+    """Показывает форму редактирования ученика"""
     if not current_user or current_user.role == UserRole.STUDENT:
         raise HTTPException(status_code=403, detail="Доступ запрещён")
 
     student = db.query(StudentDB).filter(StudentDB.id == student_id).first()
-
     if not student:
         raise HTTPException(status_code=404, detail="Ученик не найден")
 
@@ -496,41 +439,29 @@ async def update_student(
 ):
     """Обновляет данные ученика"""
     student = db.query(StudentDB).filter(StudentDB.id == student_id).first()
-
     if not student:
         raise HTTPException(status_code=404, detail="Ученик не найден")
 
-    # Обновляем поля
     student.name = name
     student.grade = grade
     student.hobby = hobby
-
     db.commit()
 
-    # # Перенаправляем на страницу профиля
-    # return RedirectResponse(url=f"/student/{name}", status_code=303)
-
-    # Возвращаемся на страницу профиля по ID
     return RedirectResponse(url=f"/student/{student_id}", status_code=303)
 
 
-
-# Если нужно обновлять и аватарку
 @app.post("/edit/{student_id}/avatar")
 async def update_avatar(
     student_id: int,
     avatar: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: Optional[UserDB] = Depends(get_current_user_from_session)  # ✅ ДОБАВЛЕНО
+    current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """Обновляет аватарку ученика (только для учителя и админа)"""
-    # ✅ ПРОВЕРКА ПРАВ
+    """Обновляет аватарку ученика"""
     if not current_user or current_user.role == UserRole.STUDENT:
         raise HTTPException(status_code=403, detail="Доступ запрещён")
 
-    """Обновляет аватарку ученика"""
     student = db.query(StudentDB).filter(StudentDB.id == student_id).first()
-
     if not student:
         raise HTTPException(status_code=404, detail="Ученик не найден")
 
@@ -539,22 +470,18 @@ async def update_avatar(
     except HTTPException as e:
         raise e
 
-    # Сохраняем новую картинку
     filename = f"{student.name}_{avatar.filename}"
     filepath = os.path.join(AVATAR_DIR, filename)
-
     with open(filepath, "wb") as buffer:
         shutil.copyfileobj(avatar.file, buffer)
 
-    # Обновляем путь к аватарке
     student.avatar = f"/static/avatars/{filename}"
     db.commit()
 
-    # return RedirectResponse(url=f"/student/{student.name}", status_code=303)
-    # ✅ ИСПРАВЛЕНО: перенаправляем на ID, а не на имя!
     return RedirectResponse(url=f"/student/{student.id}", status_code=303)
 
-# ========== ДОБАВЛЕНИЕ ОЦЕНКИ (только для учителя и админа) ==========
+
+# ========== ДОБАВЛЕНИЕ ОЦЕНКИ ==========
 @app.get("/student/{student_id}/add-grade", response_class=HTMLResponse)
 async def show_add_grade_form(
         request: Request,
@@ -567,7 +494,6 @@ async def show_add_grade_form(
         raise HTTPException(status_code=403, detail="Доступ запрещён")
 
     student = db.query(StudentDB).filter(StudentDB.id == student_id).first()
-
     if not student:
         raise HTTPException(status_code=404, detail="Ученик не найден")
 
@@ -581,7 +507,6 @@ async def show_add_grade_form(
     )
 
 
-# ========== ДОБАВЛЕНИЕ ОЦЕНКИ (POST) ==========
 @app.post("/student/{student_id}/add-grade")
 async def add_grade(
         request: Request,
@@ -593,12 +518,11 @@ async def add_grade(
         db: Session = Depends(get_db),
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """Добавляет новую оценку ученику (только для учителя и админа)"""
+    """Добавляет новую оценку"""
     if not current_user or current_user.role == UserRole.STUDENT:
         raise HTTPException(status_code=403, detail="Доступ запрещён")
 
     student = db.query(StudentDB).filter(StudentDB.id == student_id).first()
-
     if not student:
         raise HTTPException(status_code=404, detail="Ученик не найден")
 
@@ -607,18 +531,16 @@ async def add_grade(
         score=score,
         date=date,
         comment=comment,
-        teacher_name=current_user.username,  # запоминаем, кто поставил оценку
+        teacher_name=current_user.username,
         student_id=student_id
     )
-
     db.add(new_grade)
     db.commit()
 
     return RedirectResponse(url=f"/student/{student_id}", status_code=303)
 
 
-
-# ========== УДАЛЕНИЕ ОЦЕНКИ (только для учителя и админа) ==========
+# ========== УДАЛЕНИЕ ОЦЕНКИ ==========
 @app.post("/grade/{grade_id}/delete")
 async def delete_grade(
         grade_id: int,
@@ -630,7 +552,6 @@ async def delete_grade(
         raise HTTPException(status_code=403, detail="Доступ запрещён")
 
     grade = db.query(GradeDB).filter(GradeDB.id == grade_id).first()
-
     if not grade:
         raise HTTPException(status_code=404, detail="Оценка не найдена")
 
@@ -641,12 +562,7 @@ async def delete_grade(
     return RedirectResponse(url=f"/student/{student_id}", status_code=303)
 
 
-
 # ========== КРУЖКИ ==========
-
-
-
-# Добавление кружка (админ-функция)
 @app.post("/clubs/add")
 async def add_club(
     request: Request,
@@ -655,99 +571,81 @@ async def add_club(
     room: Annotated[str, Form()],
     schedule: Annotated[str, Form()] = "",
     db: Session = Depends(get_db),
-    current_user: Optional[UserDB] = Depends(get_current_user_from_session)  # ✅ ДОБАВЛЕНО
+    current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
     """Добавляет новый кружок (только для админа)"""
-    # ✅ ПРОВЕРКА ПРАВ
     if not current_user or current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Доступ запрещён. Только для администратора.")
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
 
-    """Добавляет новый кружок"""
     new_club = ClubDB(
         name=name,
         teacher=teacher,
         room=room,
         schedule=schedule
     )
-
     db.add(new_club)
-    db.commit() # Сохраняем изменения в БД
+    db.commit()
 
     return RedirectResponse(url="/clubs", status_code=303)
 
 
-
-
-# Запись ученика в кружок (через данные формы)
 @app.post("/student/{student_id}/join-club")
 async def join_club_form(
         student_id: int,
         club_id: Annotated[int, Form()],
         db: Session = Depends(get_db),
-        current_user: Optional[UserDB] = Depends(get_current_user_from_session)  # ✅ ДОБАВЛЕНО
+        current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """Записывает ученика в кружок (только ученик может записать себя)"""
-    # ✅ ПРОВЕРКА ПРАВ: только ученик может записать СЕБЯ
+    """Записывает ученика в кружок"""
     if not current_user:
         raise HTTPException(status_code=403, detail="Доступ запрещён")
 
-    # Только ученик может записать СЕБЯ
     if current_user.role != UserRole.STUDENT:
         raise HTTPException(status_code=403, detail="Только ученики могут записываться в кружки")
 
-    # Ученик может записать только себя
     if current_user.student_id != student_id:
         raise HTTPException(status_code=403, detail="Вы можете записать только себя")
 
-    """Записывает ученика в кружок (данные из формы)"""
-    # Проверяем, что ученик и кружок существуют
     student = db.query(StudentDB).filter(StudentDB.id == student_id).first()
     club = db.query(ClubDB).filter(ClubDB.id == club_id).first()
 
     if not student or not club:
         raise HTTPException(status_code=404, detail="Ученик или кружок не найдены")
 
-    # Проверяем, не записан ли уже
     existing = db.query(StudentClubDB).filter(
         StudentClubDB.student_id == student_id,
         StudentClubDB.club_id == club_id
     ).first()
 
     if not existing:
-        # Записываем
         student_club = StudentClubDB(
             student_id=student_id,
             club_id=club_id,
             join_date=datetime.now().strftime("%d.%m.%Y")
         )
         db.add(student_club)
-        db.commit() # Сохраняем изменения в БД
+        db.commit()
 
-    # return RedirectResponse(url=f"/student/{student.name}", status_code=303)
-    # ✅ ИСПРАВЛЕНО: перенаправляем на ID, а не на имя!
     return RedirectResponse(url=f"/student/{student_id}", status_code=303)
 
-# Отписать ученика от кружка
+
 @app.post("/student/{student_id}/leave-club/{club_id}")
 async def leave_club(
         student_id: int,
         club_id: int,
         db: Session = Depends(get_db),
-        current_user: Optional[UserDB] = Depends(get_current_user_from_session)  # ✅ ДОБАВЛЕНО
+        current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
     """Отписывает ученика от кружка"""
-    # ✅ ПРОВЕРКА ПРАВ
     if not current_user:
         raise HTTPException(status_code=403, detail="Доступ запрещён")
 
-    # Только ученик может отписать СЕБЯ
     if current_user.role != UserRole.STUDENT:
         raise HTTPException(status_code=403, detail="Только ученики могут отписываться от кружков")
 
     if current_user.student_id != student_id:
         raise HTTPException(status_code=403, detail="Вы можете отписать только себя")
 
-    """Отписывает ученика от кружка"""
     student_club = db.query(StudentClubDB).filter(
         StudentClubDB.student_id == student_id,
         StudentClubDB.club_id == club_id
@@ -756,32 +654,121 @@ async def leave_club(
     if student_club:
         db.delete(student_club)
         db.commit()
+
     return RedirectResponse(url=f"/student/{student_id}", status_code=303)
 
 
+# ========== ЛИДЕРЫ ==========
+@app.get("/leaders", response_class=HTMLResponse)
+async def leaders_board(
+    request: Request,
+    grade: str = "all",
+    min_avg: str = "0",
+    sort: str = "avg_desc",
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_current_user_from_session)
+):
+    """Страница с рейтингом учеников"""
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    query = db.query(StudentDB)
+    if grade != "all":
+        query = query.filter(StudentDB.grade == int(grade))
+    students = query.all()
+
+    leaders = []
+    for student in students:
+        grades = student.grades
+        if grades:
+            avg_score = sum(g.score for g in grades) / len(grades)
+            grades_count = len(grades)
+        else:
+            avg_score = 0
+            grades_count = 0
+
+        subject_scores = {}
+        for g in grades:
+            if g.subject not in subject_scores:
+                subject_scores[g.subject] = []
+            subject_scores[g.subject].append(g.score)
+
+        best_subject = None
+        if subject_scores:
+            best_subject = max(subject_scores.items(), key=lambda x: sum(x[1])/len(x[1]))[0]
+
+        leaders.append({
+            'id': student.id,
+            'name': student.name,
+            'grade': student.grade,
+            'avatar': student.avatar,
+            'average_score': avg_score,
+            'grades_count': grades_count,
+            'clubs_count': len(student.clubs),
+            'best_subject': best_subject
+        })
+
+    min_avg_float = float(min_avg)
+    if min_avg_float > 0:
+        leaders = [l for l in leaders if l['average_score'] >= min_avg_float]
+
+    if sort == "avg_desc":
+        leaders.sort(key=lambda x: x['average_score'], reverse=True)
+    elif sort == "avg_asc":
+        leaders.sort(key=lambda x: x['average_score'])
+    elif sort == "name_asc":
+        leaders.sort(key=lambda x: x['name'])
+    elif sort == "name_desc":
+        leaders.sort(key=lambda x: x['name'], reverse=True)
+    elif sort == "grade_asc":
+        leaders.sort(key=lambda x: x['grade'])
+    elif sort == "grade_desc":
+        leaders.sort(key=lambda x: x['grade'], reverse=True)
+
+    all_students = db.query(StudentDB).all()
+    all_grades = db.query(GradeDB).all()
+    total_grades = len(all_grades)
+    school_average = sum(g.score for g in all_grades) / total_grades if total_grades > 0 else 0
+    excellent_count = len([l for l in leaders if l['average_score'] >= 4.5])
+
+    stats = {
+        'total_students': len(all_students),
+        'total_grades': total_grades,
+        'school_average': school_average,
+        'excellent_count': excellent_count
+    }
+
+    return templates.TemplateResponse(
+        "leaders.html",
+        {
+            "request": request,
+            "leaders": leaders,
+            "stats": stats,
+            "current_grade": grade,
+            "current_min_avg": min_avg,
+            "current_sort": sort,
+            "title": "Лидеры успеваемости",
+            "current_user": current_user,
+            "school_name": "Школа №7"
+        }
+    )
 
 
-
-# ========== АДМИНИСТРАТИВНЫЙ ИНТЕРФЕЙС (ТОЛЬКО ДЛЯ ADMIN) ==========
-# Все эндпоинты ниже доступны ТОЛЬКО пользователям с ролью ADMIN
-
+# ========== АДМИНИСТРАТИВНЫЙ ИНТЕРФЕЙС ==========
 def check_admin(current_user: Optional[UserDB]):
     """Проверяет, является ли пользователь администратором"""
     if not current_user or current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Доступ запрещён. Только для администратора.")
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
 
 
-
-# Страница администрирования кружков
 @app.get("/admin/clubs", response_class=HTMLResponse)
 async def admin_clubs(
         request: Request,
         db: Session = Depends(get_db),
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """Административная страница управления кружками (только ADMIN)"""
+    """Страница управления кружками (только ADMIN)"""
     check_admin(current_user)
-
     clubs = db.query(ClubDB).all()
     return templates.TemplateResponse(
         "admin_clubs.html",
@@ -794,7 +781,6 @@ async def admin_clubs(
     )
 
 
-# Редактирование кружка
 @app.get("/admin/clubs/{club_id}/edit", response_class=HTMLResponse)
 async def edit_club_form(
         request: Request,
@@ -802,13 +788,11 @@ async def edit_club_form(
         db: Session = Depends(get_db),
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """Форма редактирования кружка (только ADMIN)"""
+    """Форма редактирования кружка"""
     check_admin(current_user)
-
     club = db.query(ClubDB).filter(ClubDB.id == club_id).first()
     if not club:
         raise HTTPException(status_code=404, detail="Кружок не найден")
-
     return templates.TemplateResponse(
         "edit_club.html",
         {
@@ -830,43 +814,35 @@ async def update_club(
         db: Session = Depends(get_db),
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """Обновляет данные кружка (только ADMIN)"""
+    """Обновляет данные кружка"""
     check_admin(current_user)
-
     club = db.query(ClubDB).filter(ClubDB.id == club_id).first()
     if not club:
         raise HTTPException(status_code=404, detail="Кружок не найден")
-
     club.name = name
     club.teacher = teacher
     club.room = room
     club.schedule = schedule
     db.commit()
-
     return RedirectResponse(url="/admin/clubs", status_code=303)
 
 
-# Удаление кружка
 @app.post("/admin/clubs/{club_id}/delete")
 async def delete_club(
         club_id: int,
         db: Session = Depends(get_db),
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """Удаляет кружок (только ADMIN)"""
+    """Удаляет кружок"""
     check_admin(current_user)
-
     club = db.query(ClubDB).filter(ClubDB.id == club_id).first()
     if not club:
         raise HTTPException(status_code=404, detail="Кружок не найден")
-
     db.delete(club)
     db.commit()
-
     return RedirectResponse(url="/admin/clubs", status_code=303)
 
 
-# Быстрое добавление нескольких кружков
 @app.post("/admin/clubs/bulk-add")
 async def bulk_add_clubs(
         request: Request,
@@ -874,7 +850,7 @@ async def bulk_add_clubs(
         db: Session = Depends(get_db),
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """Массовое добавление кружков (только ADMIN)"""
+    """Массовое добавление кружков"""
     check_admin(current_user)
     lines = clubs_data.strip().split('\n')
     added = 0
@@ -900,7 +876,6 @@ async def bulk_add_clubs(
         db.commit()
 
     clubs = db.query(ClubDB).all()
-
     return templates.TemplateResponse(
         "admin_clubs.html",
         {
@@ -913,20 +888,16 @@ async def bulk_add_clubs(
     )
 
 
-# ========== УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ (ТОЛЬКО ДЛЯ ADMIN) ==========
-
+# ========== УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ==========
 @app.get("/admin/users", response_class=HTMLResponse)
 async def admin_users(
         request: Request,
         db: Session = Depends(get_db),
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """Страница управления пользователями (только ADMIN)"""
+    """Страница управления пользователями"""
     check_admin(current_user)
-
-    # Получаем всех пользователей с информацией об учениках
     users = db.query(UserDB).all()
-
     return templates.TemplateResponse(
         "admin_users.html",
         {
@@ -940,30 +911,26 @@ async def admin_users(
 
 @app.post("/admin/users/{user_id}/reset-password")
 async def reset_user_password(
-        request: Request,  # ✅ ДОБАВЛЯЕМ request!
+        request: Request,
         user_id: int,
         db: Session = Depends(get_db),
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """Сброс пароля пользователя (только ADMIN)"""
+    """Сброс пароля пользователя"""
     check_admin(current_user)
-
     user = db.query(UserDB).filter(UserDB.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-    # Генерируем новый пароль
     new_password = generate_password()
     user.password = new_password
     db.commit()
 
-    # Возвращаемся на страницу управления с новым паролем
     users = db.query(UserDB).all()
-
     return templates.TemplateResponse(
         "admin_users.html",
         {
-            "request": request,  # ✅ ТЕПЕРЬ request определён
+            "request": request,
             "users": users,
             "title": "Управление пользователями",
             "current_user": current_user,
@@ -980,30 +947,28 @@ async def delete_user(
         db: Session = Depends(get_db),
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """Удаляет пользователя (только ADMIN)"""
+    """Удаляет пользователя"""
     check_admin(current_user)
-
     user = db.query(UserDB).filter(UserDB.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-    # Нельзя удалить самого себя
     if user.id == current_user.id:
         raise HTTPException(status_code=403, detail="Нельзя удалить самого себя")
 
     db.delete(user)
     db.commit()
-
     return RedirectResponse(url="/admin/users", status_code=303)
 
-# ========== СПИСОК КРУЖКОВ (все могут смотреть) ==========
+
+# ========== СПИСОК КРУЖКОВ ==========
 @app.get("/clubs", response_class=HTMLResponse)
 async def list_clubs(
         request: Request,
         db: Session = Depends(get_db),
         current_user: Optional[UserDB] = Depends(get_current_user_from_session)
 ):
-    """Показывает список всех кружков (доступно всем)"""
+    """Показывает список всех кружков"""
     if not current_user:
         return RedirectResponse(url="/login", status_code=303)
 

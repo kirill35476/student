@@ -1,130 +1,52 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-</head>
-<body class="bg-light">
-    <div class="container py-4">
-        <nav aria-label="breadcrumb" class="mb-4">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/">Главная</a></li>
-                <li class="breadcrumb-item"><a href="/clubs">Кружки</a></li>
-                <li class="breadcrumb-item active">Администрирование</li>
-            </ol>
-        </nav>
+{% extends "base.html" %}
 
-        <h1 class="mb-4"><i class="bi bi-gear-fill"></i> {{ title }}</h1>
+{% block title %}{{ title }}{% endblock %}
 
-        {% if success %}
-        <div class="alert alert-success alert-dismissible fade show">
-            {{ success }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-        {% endif %}
+{% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="/clubs">Кружки</a></li>
+<li class="breadcrumb-item active">Управление</li>
+{% endblock %}
 
-        {% if errors %}
-        <div class="alert alert-warning">
-            <ul class="mb-0">
-                {% for err in errors %}
-                <li>{{ err }}</li>
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-gear-fill"></i> {{ title }}</h2>
+
+<div class="row">
+    <div class="col-lg-7 mb-4">
+        <div class="card-custom">
+            <h5>Список кружков</h5>
+            {% if clubs %}
+            <div class="list-group">
+                {% for club in clubs %}
+                <div class="list-group-item d-flex justify-content-between">
+                    <div><strong>{{ club.name }}</strong><br><small>{{ club.teacher }} · {{ club.room }}</small></div>
+                    <div>
+                        <a href="/admin/clubs/{{ club.id }}/edit" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                        <form action="/admin/clubs/{{ club.id }}/delete" method="post" class="d-inline"><button class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить?')"><i class="bi bi-trash"></i></button></form>
+                    </div>
+                </div>
                 {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
-
-        <div class="row">
-            <!-- Существующие кружки -->
-            <div class="col-lg-7 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0">Список кружков</h5>
-                    </div>
-                    <div class="card-body p-0">
-                        {% if clubs %}
-                        <div class="list-group list-group-flush">
-                            {% for club in clubs %}
-                            <div class="list-group-item d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong>{{ club.name }}</strong><br>
-                                    <small>{{ club.teacher }} · каб. {{ club.room }} · {{ club.schedule }}</small>
-                                </div>
-                                <div class="btn-group btn-group-sm">
-                                    <a href="/admin/clubs/{{ club.id }}/edit" class="btn btn-outline-primary">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <form action="/admin/clubs/{{ club.id }}/delete" method="post" class="d-inline">
-                                        <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Удалить кружок {{ club.name }}?')">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% else %}
-                        <div class="p-3 text-muted">Нет кружков</div>
-                        {% endif %}
-                    </div>
-                </div>
             </div>
-
-            <!-- Добавление кружков -->
-            <div class="col-lg-5">
-                <!-- Одиночное добавление -->
-                <div class="card shadow-sm border-0 mb-4">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Добавить один кружок</h5>
-                    </div>
-                    <div class="card-body">
-                        <form action="/clubs/add" method="post">
-                            <div class="mb-3">
-                                <label class="form-label">Название</label>
-                                <input type="text" name="name" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Преподаватель</label>
-                                <input type="text" name="teacher" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Кабинет</label>
-                                <input type="text" name="room" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Расписание</label>
-                                <input type="text" name="schedule" class="form-control" placeholder="например: Пн, Ср 15:00">
-                            </div>
-                            <button type="submit" class="btn btn-success w-100">
-                                <i class="bi bi-check-lg"></i> Добавить
-                            </button>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Массовое добавление -->
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0"><i class="bi bi-file-spreadsheet"></i> Массовое добавление</h5>
-                    </div>
-                    <div class="card-body">
-                        <form action="/admin/clubs/bulk-add" method="post">
-                            <div class="mb-3">
-                                <label class="form-label">Данные (каждая строка — новый кружок)</label>
-                                <textarea name="clubs_data" class="form-control" rows="5" placeholder="Название|Учитель|Кабинет|Расписание&#10;Робототехника|Иванов И.И.|305|Вт, Чт 16:00"></textarea>
-                                <div class="form-text">Формат: Название|Учитель|Кабинет|Расписание (расписание опционально)</div>
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100">
-                                <i class="bi bi-upload"></i> Загрузить несколько
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
+            {% else %}<p class="text-muted">Нет кружков</p>{% endif %}
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+    <div class="col-lg-5">
+        <div class="card-custom mb-4">
+            <h5><i class="bi bi-plus-circle"></i> Добавить кружок</h5>
+            <form action="/clubs/add" method="post">
+                <input type="text" name="name" class="form-control mb-2" placeholder="Название" required>
+                <input type="text" name="teacher" class="form-control mb-2" placeholder="Преподаватель" required>
+                <input type="text" name="room" class="form-control mb-2" placeholder="Кабинет" required>
+                <input type="text" name="schedule" class="form-control mb-2" placeholder="Расписание">
+                <button type="submit" class="btn btn-success w-100"><i class="bi bi-check-lg"></i> Добавить</button>
+            </form>
+        </div>
+        <div class="card-custom">
+            <h5><i class="bi bi-file-spreadsheet"></i> Массовое добавление</h5>
+            <form action="/admin/clubs/bulk-add" method="post">
+                <textarea name="clubs_data" class="form-control mb-2" rows="4" placeholder="Название|Учитель|Кабинет|Расписание"></textarea>
+                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-upload"></i> Загрузить</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

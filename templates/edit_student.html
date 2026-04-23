@@ -1,56 +1,23 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-</head>
-<body class="bg-light">
-    <div class="container py-5">
-        <nav aria-label="breadcrumb" class="mb-4">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/">Главная</a></li>
-                <li class="breadcrumb-item"><a href="/student/{{ student.name }}">{{ student.name }}</a></li>
-                <li class="breadcrumb-item active">Редактирование</li>
-            </ol>
-        </nav>
+{% extends "base.html" %}
 
-        <div class="row justify-content-center">
-            <div class="col-md-6">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-white">
-                        <h4 class="mb-0"><i class="bi bi-pencil-square"></i> {{ title }}</h4>
-                    </div>
-                    <div class="card-body">
-                        <form action="/edit/{{ student.id }}" method="post">
-                            <div class="mb-3">
-                                <label for="name" class="form-label">Имя</label>
-                                <input type="text" class="form-control" id="name" name="name" value="{{ student.name }}" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="grade" class="form-label">Класс</label>
-                                <input type="number" class="form-control" id="grade" name="grade" value="{{ student.grade }}" min="1" max="11" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="hobby" class="form-label">Хобби</label>
-                                <input type="text" class="form-control" id="hobby" name="hobby" value="{{ student.hobby }}" required>
-                            </div>
-                            <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="bi bi-check-lg"></i> Сохранить изменения
-                                </button>
-                                <a href="/student/{{ student.name }}" class="btn btn-outline-secondary">
-                                    <i class="bi bi-x-lg"></i> Отмена
-                                </a>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
+{% block title %}{{ title }}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="/student/{{ student.id }}">{{ student.name }}</a></li>
+<li class="breadcrumb-item active">Редактирование</li>
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <h4 class="mb-4"><i class="bi bi-pencil-square"></i> {{ title }}</h4>
+    <form action="/edit/{{ student.id }}" method="post">
+        <div class="mb-3"><label class="form-label">Имя</label><input type="text" name="name" class="form-control" value="{{ student.name }}" required></div>
+        <div class="mb-3"><label class="form-label">Класс</label><input type="number" name="grade" class="form-control" value="{{ student.grade }}" min="1" max="11" required></div>
+        <div class="mb-3"><label class="form-label">Хобби</label><input type="text" name="hobby" class="form-control" value="{{ student.hobby }}" required></div>
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Сохранить</button>
+            <a href="/student/{{ student.id }}" class="btn btn-outline-secondary">Отмена</a>
         </div>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+    </form>
+</div>
+{% endblock %}

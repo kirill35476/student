@@ -1,69 +1,29 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-</head>
-<body class="bg-light">
-    <div class="container py-5">
-        <nav aria-label="breadcrumb" class="mb-4">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/">Главная</a></li>
-                <li class="breadcrumb-item"><a href="/student/{{ student.name }}">{{ student.name }}</a></li>
-                <li class="breadcrumb-item active">Добавить оценку</li>
-            </ol>
-        </nav>
+{% extends "base.html" %}
 
-        <div class="row justify-content-center">
-            <div class="col-md-6">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-white">
-                        <h4 class="mb-0"><i class="bi bi-plus-circle"></i> {{ title }}</h4>
-                    </div>
-                    <div class="card-body">
-                        <form action="/student/{{ student.id }}/add-grade" method="post">
-                            <div class="mb-3">
-                                <label for="subject" class="form-label">Предмет</label>
-                                <input type="text" class="form-control" id="subject" name="subject" placeholder="Математика" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="score" class="form-label">Оценка</label>
-                                <select class="form-select" id="score" name="score" required>
-                                    <option value="5">5 (отлично)</option>
-                                    <option value="4">4 (хорошо)</option>
-                                    <option value="3">3 (удовлетворительно)</option>
-                                    <option value="2">2 (неудовлетворительно)</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label for="date" class="form-label">Дата</label>
-                                <input type="date" class="form-control" id="date" name="date" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="comment" class="form-label">Комментарий</label>
-                                <textarea class="form-control" id="comment" name="comment" rows="2"></textarea>
-                            </div>
-                            <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-success">
-                                    <i class="bi bi-check-lg"></i> Добавить оценку
-                                </button>
-                                <a href="/student/{{ student.name }}" class="btn btn-outline-secondary">
-                                    <i class="bi bi-arrow-left"></i> Назад
-                                </a>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
+{% block title %}{{ title }}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="/student/{{ student.id }}">{{ student.name }}</a></li>
+<li class="breadcrumb-item active">Добавить оценку</li>
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <h4 class="mb-4"><i class="bi bi-plus-circle"></i> {{ title }}</h4>
+    <form action="/student/{{ student.id }}/add-grade" method="post">
+        <div class="mb-3"><label class="form-label">Предмет</label><input type="text" name="subject" class="form-control" placeholder="Математика" required></div>
+        <div class="mb-3"><label class="form-label">Оценка</label>
+            <select name="score" class="form-select" required>
+                <option value="5">5 (отлично)</option><option value="4">4 (хорошо)</option><option value="3">3 (удовл.)</option><option value="2">2 (неуд.)</option>
+            </select>
         </div>
-    </div>
-    <script>
-        // Установить сегодняшнюю дату по умолчанию
-        document.getElementById('date').valueAsDate = new Date();
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+        <div class="mb-3"><label class="form-label">Дата</label><input type="date" name="date" class="form-control" required></div>
+        <div class="mb-3"><label class="form-label">Комментарий</label><textarea name="comment" class="form-control" rows="2"></textarea></div>
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-success"><i class="bi bi-check-lg"></i> Добавить</button>
+            <a href="/student/{{ student.id }}" class="btn btn-outline-secondary">Назад</a>
+        </div>
+    </form>
+</div>
+<script>document.querySelector('input[name="date"]').valueAsDate = new Date();</script>
+{% endblock %}

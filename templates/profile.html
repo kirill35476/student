@@ -1,216 +1,119 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <style>
-        .profile-avatar {
-            width: 150px;
-            height: 150px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 4rem;
-            font-weight: bold;
-            overflow: hidden;
-            margin: 0 auto;
-        }
-        .profile-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .club-card {
-            transition: all 0.2s;
-        }
-        .club-card:hover {
-            background-color: #f8f9fa;
-        }
-    </style>
-</head>
-<body class="bg-light">
-    <div class="container py-4">
-        <!-- Навигация -->
-        <nav aria-label="breadcrumb" class="mb-4">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/"><i class="bi bi-house"></i> Главная</a></li>
-                <li class="breadcrumb-item active">{{ student.name }}</li>
-            </ol>
-        </nav>
+{% extends "base.html" %}
 
-        <!-- Сообщение об успехе -->
-        {% if success %}
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            {{ success }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+{% block title %}{{ title }}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active">{{ student.name }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card-custom text-center">
+            <div class="avatar-large mb-3">
+                {% if student.avatar %}<img src="{{ student.avatar }}" alt="{{ student.name }}">
+                {% else %}{{ student.name[0]|upper }}{% endif %}
+            </div>
+            <h2>{{ student.name }}</h2>
+            <p><i class="bi bi-backpack"></i> {{ student.grade }} класс<br><i class="bi bi-heart"></i> {{ student.hobby }}</p>
+            
+            <!-- СРЕДНИЙ БАЛЛ -->
+            {% if student.grades|length > 0 %}
+                {% set total = namespace(value=0) %}
+                {% for g in student.grades %}
+                    {% set total.value = total.value + g.score %}
+                {% endfor %}
+                {% set avg = total.value / student.grades|length %}
+            <div class="mb-3">
+                <span class="average-score
+                    {% if avg >= 4.5 %}score-excellent
+                    {% elif avg >= 4.0 %}score-good
+                    {% elif avg >= 3.0 %}score-average
+                    {% else %}score-poor{% endif %}">
+                    {{ "%.2f"|format(avg) }}
+                </span>
+                <br><small>средний балл ({{ student.grades|length }} оценок)</small>
+            </div>
+            {% endif %}
+
+            {% if can_edit %}
+            <div class="d-grid gap-2">
+                <a href="/edit/{{ student.id }}" class="btn btn-outline-primary btn-icon"><i class="bi bi-pencil"></i> Редактировать</a>
+                <button class="btn btn-outline-warning btn-icon" data-bs-toggle="modal" data-bs-target="#changeAvatarModal"><i class="bi bi-camera"></i> Сменить фото</button>
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
 
-        <div class="row">
-            <!-- Левая колонка - информация -->
-            <div class="col-md-4 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-body text-center">
-                        <div class="profile-avatar mb-3">
-                            {% if student.avatar %}
-                                <img src="{{ student.avatar }}" alt="{{ student.name }}">
-                            {% else %}
-                                {{ student.name[0]|upper }}
-                            {% endif %}
-                        </div>
-                        <h2 class="card-title">{{ student.name }}</h2>
-                        <p class="text-secondary">
-                            <i class="bi bi-backpack"></i> {{ student.grade }} класс<br>
-                            <i class="bi bi-heart"></i> {{ student.hobby }}
-                        </p>
-                        <div class="d-grid gap-2">
-                            <a href="/edit/{{ student.id }}" class="btn btn-outline-primary">
-                                <i class="bi bi-pencil"></i> Редактировать
-                            </a>
-                            <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#changeAvatarModal">
-                                <i class="bi bi-camera"></i> Сменить фото
-                            </button>
-                        </div>
-                    </div>
+        <div class="card-custom">
+            <h5><i class="bi bi-calendar-check"></i> Кружки</h5>
+            {% if student.clubs %}
+                {% for club in student.clubs %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div><strong>{{ club.name }}</strong><br><small>{{ club.teacher }}</small></div>
+                    {% if can_leave_club %}
+                    <form action="/student/{{ student.id }}/leave-club/{{ club.id }}" method="post"><button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button></form>
+                    {% endif %}
                 </div>
+                {% endfor %}
+            {% else %}<p class="text-muted">Нет кружков</p>{% endif %}
 
-                <!-- Кружки ученика -->
-                <div class="card shadow-sm border-0 mt-4">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0"><i class="bi bi-calendar-check"></i> Кружки и секции</h5>
-                    </div>
-                    <div class="card-body">
-                        {% if student.clubs %}
-                            <div class="list-group list-group-flush">
-                                {% for student_club in student.clubs %}
-                                <div class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>{{ student_club.name }}</strong><br>
-                                        <small class="text-muted">{{ student_club.teacher }} · {{ student_club.schedule }}</small>
-                                    </div>
-                                    <form action="/student/{{ student.id }}/leave-club/{{ student_club.id }}" method="post" class="m-0">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">
-                                            <i class="bi bi-x-circle"></i>
-                                        </button>
-                                    </form>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <p class="text-muted">Не записан ни в один кружок.</p>
-                        {% endif %}
-
-                        <!-- Добавление в кружок -->
-                        <form action="/student/{{ student.id }}/join-club" method="post" class="mt-3">
-                            <div class="input-group">
-                                <select name="club_id" class="form-select" required>
-                                    <option value="">Выберите кружок...</option>
-                                    {% for club in all_clubs %}
-                                        <option value="{{ club.id }}">{{ club.name }} ({{ club.teacher }})</option>
-                                    {% endfor %}
-                                </select>
-                                <button type="submit" class="btn btn-success">
-                                    <i class="bi bi-plus-lg"></i>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Правая колонка - оценки -->
-            <div class="col-md-8">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="bi bi-journal-bookmark-fill"></i> Оценки</h5>
-                        <a href="/student/{{ student.id }}/add-grade" class="btn btn-sm btn-primary">
-                            <i class="bi bi-plus-lg"></i> Добавить оценку
-                        </a>
-                    </div>
-                    <div class="card-body">
-                        {% if student.grades %}
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle">
-                                    <thead>
-                                        <tr>
-                                            <th>Предмет</th>
-                                            <th>Оценка</th>
-                                            <th>Дата</th>
-                                            <th>Комментарий</th>
-                                            <th></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for grade in student.grades %}
-                                        <tr>
-                                            <td>{{ grade.subject }}</td>
-                                            <td>
-                                                {% if grade.score == 5 %}
-                                                    <span class="badge bg-success">5</span>
-                                                {% elif grade.score == 4 %}
-                                                    <span class="badge bg-primary">4</span>
-                                                {% elif grade.score == 3 %}
-                                                    <span class="badge bg-warning text-dark">3</span>
-                                                {% else %}
-                                                    <span class="badge bg-danger">{{ grade.score }}</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>{{ grade.date }}</td>
-                                            <td>{{ grade.comment or '—' }}</td>
-                                            <td>
-                                                <form action="/grade/{{ grade.id }}/delete" method="post" class="m-0">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                        <i class="bi bi-trash"></i>
-                                                    </button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <div class="alert alert-light">
-                                <i class="bi bi-info-circle"></i> Пока нет оценок.
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
+            {% if can_join_club %}
+            <form action="/student/{{ student.id }}/join-club" method="post" class="mt-3">
+                <select name="club_id" class="form-select mb-2" required>
+                    <option value="">Выбрать кружок...</option>
+                    {% for club in all_clubs %}<option value="{{ club.id }}">{{ club.name }}</option>{% endfor %}
+                </select>
+                <button class="btn btn-success btn-sm w-100"><i class="bi bi-plus-lg"></i> Записаться</button>
+            </form>
+            {% endif %}
         </div>
     </div>
 
-    <!-- Модальное окно смены аватара -->
-    <div class="modal fade" id="changeAvatarModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form action="/edit/{{ student.id }}/avatar" method="post" enctype="multipart/form-data">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Сменить фото профиля</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="avatar" class="form-label">Выберите изображение</label>
-                            <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*" required>
-                            <div class="form-text">JPG, PNG, GIF до 5 МБ.</div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-primary">Загрузить</button>
-                    </div>
-                </form>
+    <div class="col-md-8">
+        <div class="card-custom">
+            <div class="d-flex justify-content-between mb-3">
+                <h5><i class="bi bi-journal-bookmark-fill"></i> Оценки</h5>
+                {% if can_add_grade %}
+                <a href="/student/{{ student.id }}/add-grade" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Добавить</a>
+                {% endif %}
             </div>
+            {% if student.grades %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>Предмет</th><th>Оценка</th><th>Дата</th><th>Комментарий</th><th></th></tr></thead>
+                    <tbody>
+                        {% for grade in student.grades %}
+                        <tr>
+                            <td>{{ grade.subject }}</td>
+                            <td><span class="badge {% if grade.score == 5 %}bg-success{% elif grade.score == 4 %}bg-primary{% elif grade.score == 3 %}bg-warning{% else %}bg-danger{% endif %}">{{ grade.score }}</span></td>
+                            <td>{{ grade.date }}</td>
+                            <td>{{ grade.comment or '—' }}</td>
+                            <td>
+                                {% if can_add_grade %}
+                                <form action="/grade/{{ grade.id }}/delete" method="post"><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}<p class="text-muted">Нет оценок</p>{% endif %}
         </div>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+{% if can_edit %}
+<div class="modal fade" id="changeAvatarModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/edit/{{ student.id }}/avatar" method="post" enctype="multipart/form-data">
+                <div class="modal-header"><h5>Сменить фото</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body"><input type="file" class="form-control" name="avatar" accept="image/*" required></div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button><button type="submit" class="btn btn-primary">Загрузить</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
