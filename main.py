@@ -351,19 +351,27 @@ async def add_student_with_avatar(
     db.commit()
     db.refresh(new_student)
 
-    # Создаём пользователя
+    # 4. СОЗДАЁМ ПОЛЬЗОВАТЕЛЯ ДЛЯ УЧЕНИКА
     username = transliterate(name)
-    existing_user = db.query(UserDB).filter(UserDB.username == username).first()
-    if existing_user:
+
+    # Проверяем, не занят ли логин
+    existing_username = db.query(UserDB).filter(UserDB.username == username).first()
+    if existing_username:
+        # Если логин занят, добавляем ID в конец
         username = f"{username}_{new_student.id}"
 
     password = generate_password()
 
+    # Проверяем, есть ли уже пользователь с таким student_id
     existing_student_user = db.query(UserDB).filter(UserDB.student_id == new_student.id).first()
     if existing_student_user:
-        existing_student_user.username = username
+        # Обновляем существующего пользователя
+        # НЕ меняем username, если он уже существует у другого пользователя
+        if not db.query(UserDB).filter(UserDB.username == username, UserDB.id != existing_student_user.id).first():
+            existing_student_user.username = username
         existing_student_user.password = password
     else:
+        # Создаём нового пользователя
         new_user = UserDB(
             username=username,
             password=password,
@@ -373,9 +381,11 @@ async def add_student_with_avatar(
         db.add(new_user)
     db.commit()
 
+    # 5. ПОЛУЧАЕМ ОБНОВЛЁННЫЙ СПИСОК
     students = db.query(StudentDB).all()
     clubs = db.query(ClubDB).all()
 
+    # Определяем права доступа для отображения кнопок
     show_add_button = True
     show_edit_buttons = True
     show_delete_buttons = (current_user.role == UserRole.ADMIN)
